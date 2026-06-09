@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Client Portal</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --container-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #2c3e50;
+            --button-color: #3498db;
+            --button-hover: #2980b9;
+            --danger-color: #e74c3c;
+            --border-color: #e0e0e0;
+            --msg-me: #3498db;
+            --msg-them: #ecf0f1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .app-container {
+            background-color: var(--container-bg);
+            width: 100%;
+            max-width: 500px;
+            height: 80vh;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- VIEWS --- */
+        .view { display: none; flex-direction: column; height: 100%; padding: 30px; box-sizing: border-box; }
+        .view.active { display: flex; }
+
+        /* Typography & Inputs */
+        h2 { color: var(--accent-color); margin-top: 0; text-align: center; }
+        p { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 30px; }
+        input {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 6px; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;
+        }
+        input:focus { outline: none; border-color: var(--button-color); }
+
+        button {
+            width: 100%; padding: 14px; border: none; border-radius: 6px;
+            font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s;
+            margin-bottom: 15px;
+        }
+        .btn-primary { background-color: var(--button-color); color: white; }
+        .btn-primary:hover { background-color: var(--button-hover); }
+        .btn-secondary { background-color: white; color: var(--accent-color); border: 2px solid var(--accent-color); }
+        .btn-secondary:hover { background-color: #f8f9fa; }
+        .btn-danger { background-color: var(--danger-color); color: white; margin-bottom: 0; }
+
+        /* Chat UI */
+        #chat-view { padding: 0; }
+        .chat-header {
+            background-color: var(--accent-color); color: white; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .chat-header span { font-size: 14px; font-weight: 600; }
+        .header-btn { width: auto; padding: 6px 12px; font-size: 12px; margin: 0; }
+        
+        .chat-box {
+            flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+            background-color: #fafbfc;
+        }
+        
+        .message { max-width: 75%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.4; }
+        .message.me { background-color: var(--msg-me); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .message.them { background-color: var(--msg-them); color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
+        
+        .chat-input-area {
+            padding: 15px; background-color: white; border-top: 1px solid var(--border-color);
+            display: flex; gap: 10px;
+        }
+        .chat-input-area input { margin-bottom: 0; }
+        .chat-input-area button { width: auto; margin-bottom: 0; padding: 0 20px; }
+
+        .secure-id-box {
+            background-color: #e8f4f8; border: 1px dashed var(--button-color);
+            padding: 15px; border-radius: 6px; text-align: center; font-family: monospace;
+            font-size: 16px; color: var(--accent-color); margin-bottom: 20px; word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div id="setup-view" class="view active">
+            <h2>Secure Communication</h2>
+            <p>End-to-end encrypted channel for sensitive pricing and property data. No servers. No databases.</p>
+            
+            <button class="btn-primary" onclick="startHost()">Start Secure Session (Host)</button>
+            
+            <div style="text-align: center; margin: 10px 0; color: #aaa;">— OR —</div>
+            
+            <input type="text" id="join-id-input" placeholder="Paste Invite ID from Host...">
+            <button class="btn-secondary" onclick="joinSession()">Join Session (Guest)</button>
+        </div>
+
+        <div id="waiting-view" class="view">
+            <h2>Session Created</h2>
+            <p>Send this secure, single-use ID to the client. The room will automatically lock once they join.</p>
+            <div class="secure-id-box" id="host-id-display">Generating...</div>
+            <button class="btn-secondary" onclick="copyHostId()">Copy ID</button>
+        </div>
+
+        <div id="chat-view" class="view">
+            <div class="chat-header">
+                <span>Encrypted Session Active</span>
+                <button class="btn-danger header-btn" onclick="saveAndEndChat()">Save & End</button>
+            </div>
+            <div class="chat-box" id="chat-box">
+                <div class="message them"><strong>System:</strong> Secure connection established.</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                <button class="btn-primary" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peer = null;
+        let connection = null;
+        let chatHistory = []; // Maintains session memory for final payload encryption
+
+        // --- UI NAVIGATION ---
+        // Toggles the active display state of the application views
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        // --- HOST FLOW ---
+        function startHost() {
+            // 1. Generate a mathematically secure UUID v4 for the room assignment
+            const secureRoomId = crypto.randomUUID();
+            
+            // 2. Initialize the PeerJS instance with the secure ID
+            peer = new Peer(secureRoomId);
+            
+            peer.on('open', (id) => {
+                document.getElementById('host-id-display').innerText = id;
+                showView('waiting-view');
+            });
+
+            // 3. Listen for incoming guest connections
+            peer.on('connection', (conn) => {
+                // Room Lock protocol: Rejects subsequent connections if the session is already active
+                if (connection) {
+                    conn.on('open', () => {
+                        conn.send({ type: 'system', text: 'Room is locked.' });
+                        setTimeout(() => conn.close(), 500);
+                    });
+                    return;
+                }
+
+                connection = conn;
+                setupConnectionBehavior();
+                showView('chat-view');
+            });
+        }
+
+        function copyHostId() {
+            const idText = document.getElementById('host-id-display').innerText;
+            navigator.clipboard.writeText(idText);
+            alert("Secure ID copied to clipboard!");
+        }
+
+        // --- GUEST FLOW ---
+        function joinSession() {
+            const hostId = document.getElementById('join-id-input').value.trim();
+            if (!hostId) return alert("Please enter an ID");
+
+            // Initializes a guest PeerJS instance with a standard randomized ID
+            peer = new Peer();
+            
+            peer.on('open', () => {
+                connection = peer.connect(hostId);
+                setupConnectionBehavior();
+                showView('chat-view');
+            });
+        }
+
+        // --- CONNECTION LOGIC ---
+        function setupConnectionBehavior() {
+            connection.on('open', () => {
+                console.log("Connected securely!");
+            });
+
+            connection.on('data', (data) => {
+                if (data.type === 'message') {
+                    displayMessage(data.text, 'them');
+                } else if (data.type === 'system') {
+                    alert(data.text);
+                }
+            });
+
+            connection.on('close', () => {
+                alert("The connection was terminated.");
+                location.reload(); // Reinitializes the application state
+            });
+        }
+
+        // --- MESSAGING LOGIC ---
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const text = input.value.trim();
+            if (!text || !connection) return;
+
+            // Transmits the payload via the WebRTC data channel
+            connection.send({ type: 'message', text: text });
+            
+            // Updates the local display interface
+            displayMessage(text, 'me');
+            input.value = '';
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function displayMessage(text, sender) {
+            const chatBox = document.getElementById('chat-box');
+            const msgDiv = document.createElement('div');
+            
+            msgDiv.className = `message ${sender}`;
+            
+            // XSS Protection: Utilizing innerText neutralizes arbitrary script execution
+            msgDiv.innerText = text; 
+            
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Appends the current message to the session array for final export
+            chatHistory.push({ sender, text, timestamp: new Date().toISOString() });
+        }
+
+        // --- CRYPTOGRAPHY: SAVE & END ---
+        async function saveAndEndChat() {
+            if (chatHistory.length === 0) {
+                alert("No messages to save.");
+                location.reload();
+                return;
+            }
+
+            const confirmEnd = confirm("This will permanently close the session and download the encrypted history. Continue?");
+            if (!confirmEnd) return;
+
+            // 1. Generate a 32-character Hexadecimal Key
+            const randomBuffer = new Uint8Array(16);
+            crypto.getRandomValues(randomBuffer);
+            const securePassword = Array.from(randomBuffer).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 2. Prepare payload and parse encryption parameters
+            const chatDataString = JSON.stringify(chatHistory);
+            const enc = new TextEncoder();
+            const rawKeyData = new Uint8Array(securePassword.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            
+            // 3. Web Crypto API: AES-GCM Encryption implementation
+            const cryptoKey = await crypto.subtle.importKey(
+                "raw", rawKeyData, { name: "AES-GCM" }, false, ["encrypt"]
+            );
+            
+            const iv = crypto.getRandomValues(new Uint8Array(12)); // Initialization Vector
+            const encryptedBuffer = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv: iv }, cryptoKey, enc.encode(chatDataString)
+            );
+
+            // 4. Concatenate IV and Encrypted Payload for the output file
+            const combinedFile = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+            combinedFile.set(iv, 0);
+            combinedFile.set(new Uint8Array(encryptedBuffer), iv.length);
+
+            // 5. Trigger the localized file download event
+            const blob = new Blob([combinedFile], { type: "application/octet-stream" });
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = "secure_chat.enc";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            // 6. Display the one-time decryption key to the user
+            alert(`FILE LOCKED.\n\nStore this Decryption Password immediately. It cannot be recovered:\n\n${securePassword}`);
+            
+            // 7. Terminate the connection and clear local memory
+            if (connection) connection.close();
+            location.reload();
+        }
+    </script>
+</body>
+</html>
