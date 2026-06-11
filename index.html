@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KinetiNode Serverless P2P Chat</title>
+    <title>Secure P2P Portal</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -143,35 +143,33 @@
 <body>
 
 <div class="container">
-    <!-- LEFT SIDE: CONNECTION PLUMBING -->
     <div class="panel">
-        <h2>🔗 Handshake Control</h2>
+        <h2>🔗 Connection Protocol</h2>
         <div id="connectionStatus" class="status-badge">Status: Disconnected</div>
         
         <div>
-            <p><strong>Step 1 (Tab A):</strong> Generate an Invitation Code.</p>
+            <p><strong>Step 1 (Host):</strong> Generate a secure Invitation Code.</p>
             <button id="btnCreateOffer" style="margin-top:8px; width:100%;">1. Create Invitation Code</button>
         </div>
 
         <div>
-            <p><strong>Step 2 (Tab B):</strong> Paste Tab A's code below, then click Accept.</p>
+            <p><strong>Step 2 (Guest):</strong> Paste Host's code below, then click Accept.</p>
             <textarea id="txtIncomingOffer" placeholder="Paste incoming invitation code here..."></textarea>
             <button id="btnAcceptOffer" style="margin-top:8px; width:100%;" disabled>2. Accept Invitation & Generate Response</button>
         </div>
 
         <div>
-            <p><strong>Step 3 (Tab A):</strong> Paste Tab B's Response code here to connect.</p>
+            <p><strong>Step 3 (Host):</strong> Paste Guest's Response code here to establish connection.</p>
             <textarea id="txtIncomingAnswer" placeholder="Paste response code here..."></textarea>
-            <button id="btnFinalizeConnect" style="margin-top:8px; width:100%;" disabled>3. Finalize Connection</button>
+            <button id="btnFinalizeConnect" style="margin-top:8px; width:100%;" disabled>3. Complete Handshake</button>
         </div>
     </div>
 
-    <!-- RIGHT SIDE: THE CHAT BOX -->
     <div class="panel">
-        <h2>💬 Local P2P Chat Workspace</h2>
+        <h2>💬 Encrypted Session</h2>
         <div class="chat-box" id="chatBox">
             <div class="message msg-them" style="background:transparent; padding:0; color:var(--text-muted)">
-                Complete the handshake on the left to start chatting directly peer-to-peer.
+                Complete the authentication on the left to activate the peer-to-peer encrypted channel.
             </div>
         </div>
         <div class="input-row">
@@ -179,10 +177,9 @@
             <button id="btnSend" disabled>Send</button>
         </div>
         
-        <!-- Output Box for generated tokens -->
         <div style="margin-top: auto;">
-            <p style="margin-bottom:4px; font-weight:600;">Your Generated Handshake Token:</p>
-            <textarea id="txtLocalToken" readonly placeholder="Your connection code will appear here. Copy it and pass it to the other tab."></textarea>
+            <p style="margin-bottom:4px; font-weight:600;">System Generated Token:</p>
+            <textarea id="txtLocalToken" readonly placeholder="Your connection code will appear here. Copy it and pass it to the other party."></textarea>
             <button id="btnCopyToken" style="font-size:0.75rem; padding:4px 8px; margin-top:4px;">Copy to Clipboard</button>
         </div>
     </div>
@@ -210,7 +207,7 @@
     const msgInput = document.getElementById('msgInput');
     const btnSend = document.getElementById('btnSend');
 
-    // Enable/Disable step 2 button based on content input
+    // Enable/Disable Step 2 & 3 buttons based on content input
     txtIncomingOffer.addEventListener('input', () => {
         btnAcceptOffer.disabled = !txtIncomingOffer.value.trim();
     });
@@ -256,12 +253,12 @@
     }
 
     // -------------------------------------------------------------------------
-    // TAB A LOGIC: INITIALIZE CONNECTION
+    // HOST LOGIC: INITIALIZE CONNECTION
     // -------------------------------------------------------------------------
     btnCreateOffer.onclick = async () => {
         btnCreateOffer.disabled = true;
         
-        // Tab A owns data channel creation
+        // Host owns data channel creation
         dataChannel = peerConnection.createDataChannel("chatChannel");
         setupDataChannelEvents();
 
@@ -272,12 +269,12 @@
     };
 
     // -------------------------------------------------------------------------
-    // TAB B LOGIC: ACCEPT INVITATION & EXECUTE HANDSHAKE
+    // GUEST LOGIC: ACCEPT INVITATION & EXECUTE HANDSHAKE
     // -------------------------------------------------------------------------
     btnAcceptOffer.onclick = async () => {
         btnAcceptOffer.disabled = true;
         
-        // Tab B watches for the data channel coming from Tab A
+        // Guest watches for the data channel coming from Host
         peerConnection.ondatachannel = (event) => {
             dataChannel = event.channel;
             setupDataChannelEvents();
@@ -292,13 +289,13 @@
 
             setupIceGatheringWatcher();
         } catch (err) {
-            alert("Invalid Invitation Code! Ensure you copied the entire string from Tab A.");
+            alert("Invalid Invitation Code! Ensure the entire string was copied.");
             btnAcceptOffer.disabled = false;
         }
     };
 
     // -------------------------------------------------------------------------
-    // TAB A LOGIC: FINALIZE LOOP
+    // HOST LOGIC: FINALIZE LOOP
     // -------------------------------------------------------------------------
     btnFinalizeConnect.onclick = async () => {
         btnFinalizeConnect.disabled = true;
@@ -306,7 +303,7 @@
             const remoteAnswer = JSON.parse(atob(txtIncomingAnswer.value.trim()));
             await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteAnswer));
         } catch (err) {
-            alert("Invalid Response Code! Ensure you copied the entire string from Tab B.");
+            alert("Invalid Response Code! Ensure the entire string was copied.");
             btnFinalizeConnect.disabled = false;
         }
     };
@@ -316,11 +313,11 @@
     // -------------------------------------------------------------------------
     function setupDataChannelEvents() {
         dataChannel.onopen = () => {
-            appendMessage("System", "Direct peer-to-peer encrypted channel established!", "msg-them");
+            appendMessage("System", "Direct peer-to-peer encrypted channel established.", "msg-them");
         };
 
         dataChannel.onmessage = (event) => {
-            appendMessage("Peer", event.data, "msg-them");
+            appendMessage("Client", event.data, "msg-them");
         };
     }
 
